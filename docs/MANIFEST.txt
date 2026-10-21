@@ -1,0 +1,25 @@
+AI Concierge MVP Pack v3.3 — manifest
+generated 21 Oct 2026
+
+      size  sha256[:16]       path
+------------------------------------------------------------------------------
+     3,957  204becd649d7cdbc  CHANGELOG.md
+     7,063  2509e1ad3455f57d  KICKOFF-PROMPT.md
+     6,765  2aba1329128f1a82  PHASE-0-DECISIONS.md
+     5,427  81e14a91141e560e  START-HERE.md
+    65,551  00bbd17a7b0a5f40  01-plan/mvp-dev-plan-v3.3.md
+    49,303  4c5f481c89ef5519  02-financials/financial-model.xlsx
+    15,850  656cc8aae8a4bf5b  03-backlog/dev-backlog.csv
+     8,417  98d7f130ac582cdf  04-eval/README.md
+     3,642  06f3122f3f3b4747  04-eval/adversarial-v0.csv
+     8,313  89ba9cd68396cc16  04-eval/eval-set-v0.1.csv
+     7,392  8f25ecf419315d22  04-eval/eval-set-v0.csv
+       690  a2b18ac17dd847cc  04-eval/results-template.csv
+     8,407  2d2767f0f15dd0c2  04-eval/score_eval.py
+     5,151  76d80a5ff5985849  04-eval/fixtures/demo-hotel-es.md
+     5,555  7738cae5200b1032  04-eval/fixtures/demo-hotel-mx.md
+    43,330  b9a7d1491ef736a9  05-source/build_model.py
+     3,284  903527e31fc2cbca  05-source/cache_values.py
+------------------------------------------------------------------------------
+   248,097  bytes total · 17 files
+
