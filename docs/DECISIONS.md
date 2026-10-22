@@ -32,13 +32,16 @@ artefacts and are not edited in place — the runner, not the CSV, absorbs the i
 **Cost:** The runner is one notch looser on prose-expected items; compensated by the strict money-fact
 rule (doctrine §2.1) and by `grounded_in` id resolution, which still blocks unsourced answers.
 
-## ADR-0003 — Single Next.js app, no monorepo; Supabase CLI vendored as devDependency
+## ADR-0003 — Single Next.js app, no monorepo; Supabase CLI NOT vendored
 
-**Date:** 21 Oct 2026
+**Date:** 21 Oct 2026 (amended 22 Oct 2026 before first push)
 **Decision:** One Next.js (App Router, TypeScript) app at the repo root — no pnpm workspace, no
-packages/ tree. The Supabase CLI ships as a devDependency so `pnpm install` yields a reproducible
-one-command dev environment (`supabase db reset` + `pnpm dev`).
-**Why:** Solo maintenance; boring and explicit beats flexible. A second package would need
-workspace tooling to justify itself; nothing in Phase 0–7 needs one.
+packages/ tree. **Correction (22 Oct):** the Supabase CLI is *not* a devDependency — the binary is
+large and platform-specific. Local dev requires a globally installed CLI
+(`supabase start`/`db reset`); CI installs it via `supabase/setup-cli@v1`. Documented as a
+prerequisite in DEVELOPMENT.md. The vendoring idea was reversed during T01 implementation:
+a devDependency CLI adds install weight everywhere, while CI already documents its own
+sanctioned install path.
 **Cost:** The embeddable widget (Phase 2) must live inside this app as routes/files, not a separate
-package. Revisit only if a second deployable target appears.
+package. A new contributor must install the Supabase CLI once (one command, per-platform).
+Revisit only if a second deployable target appears.

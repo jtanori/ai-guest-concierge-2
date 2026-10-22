@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck-test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:security
+      - run: pnpm build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+
+  supabase-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase db reset
+
+  security-gates-negative-control:
+    # The gate is only trustworthy if we've proven it fails on a violation.
+    # Founder standing rule: every security test ships with a control that
+    # shows it goes red.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Negative control — a leaked service-role reference must fail the gate
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mutated
+          cp -r src /tmp/mutated/
+          cp scripts/security-gates.mjs /tmp/
+          cat >> /tmp/mutated/src/app/page.tsx <<'EOF'
+          export const leakedKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          EOF
+          set +e
+          node /tmp/security-gates.mjs /tmp/mutated/src
+          code=$?
+          set -e
+          if [ $code -eq 0 ]; then
+            echo "::error::negative control failed: gate accepted a leaked service-role reference"
+            exit 1
+          fi
+          echo "negative control passed: gate rejected the violation (exit $code)"
