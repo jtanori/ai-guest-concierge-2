@@ -45,3 +45,20 @@ sanctioned install path.
 **Cost:** The embeddable widget (Phase 2) must live inside this app as routes/files, not a separate
 package. A new contributor must install the Supabase CLI once (one command, per-platform).
 Revisit only if a second deployable target appears.
+
+## ADR-0004 — Repo is public (supersedes "private repo" from PHASE-0-DECISIONS Q4)
+
+**Date:** 22 Oct 2026 (founder decision at the T01 gate)
+**Decision:** `jtanori/ai-guest-concierge-2` is a **public** repo. GitHub's free plan cannot
+enforce branch protection on private repos (rulesets and protection API both 403), so to satisfy
+the standing rule "main is protected, CI is the approver, zero human approvals" the founder chose
+public over upgrading to Pro. The `protect-main` ruleset (id 25804261) enforces: PR required, no
+deletion/force-push, required status checks `lint-typecheck-test-build`, `supabase-schema`,
+`security-gates-negative-control`.
+**Why:** Protecting main was non-negotiable per founder doctrine; the public/private tradeoff was
+the founder's call, not the agent's guess.
+**Cost:** All code visible publicly. Mitigations in place by contract: no real credentials are
+committed (`.env.example` placeholders enforced by test + security gates), provider keys are
+owner-secret env vars with hard caps, server-only service-role key enforced by CI grep with a
+negative-control job. No business-sensitive data lives in this repo (docs describe products, not
+partners; eval fixtures use fictional demo hotels).
