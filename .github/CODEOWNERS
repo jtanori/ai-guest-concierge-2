@@ -1,0 +1,8 @@
+# Default: everything is the founder's call.
+* @jtanori
+
+# Docs are read-only without founder sign-off (pack discipline: v3.3 is the
+# source of truth, not to be edited silently).
+/docs/ @jtanori
+/README.md @jtanori
+/DEVELOPMENT.md @jtanori
