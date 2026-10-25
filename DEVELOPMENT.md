@@ -12,7 +12,7 @@ pnpm dev
 
 ## Prerequisites
 
-- Node.js >= 20 (`package.json` `engines` enforces it)
+- Node.js >= 22.13 (pnpm 11 requires it; `package.json` `engines` enforces it)
 - pnpm 11 (`packageManager` pin — corepack handles it)
 - Supabase CLI **installed globally** (ADR-0003 amendment: not a devDependency —
   the binary is large and platform-specific; CI uses `supabase/setup-cli@v1`):
