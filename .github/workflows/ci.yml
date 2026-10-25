@@ -19,7 +19,7 @@ jobs:
 #        version comes from packageManager in package.json
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
@@ -56,7 +56,7 @@ jobs:
 #        version comes from packageManager in package.json
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Negative control — a leaked service-role reference must fail the gate
         run: |
           set -euo pipefail
