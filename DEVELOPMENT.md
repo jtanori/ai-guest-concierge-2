@@ -61,3 +61,30 @@ control** proving the security gate fails on an injected violation.
 
 `main` is protected: PRs required, status checks required, **zero human
 approvals** — CI is the approver.
+
+## Staging (.env.staging.local — never committed)
+
+Holds the real staging credentials (Supabase `iocd****...`, us-east-1 per
+ADR-0005; production must be eu-central-1). Verify it any time:
+
+```bash
+node scripts/verify-staging.mjs            # read-only checks
+node scripts/verify-staging.mjs --probe    # proves the anon key on a real
+                                           # table (creates + drops a probe)
+```
+
+Platform gotchas learned the hard way (2026 platform behaviour):
+
+- `GET /rest/v1/` (root OpenAPI) returns `401 {"message":"Invalid API key"}`
+  for the anon/publishable keys on projects with **zero public tables**.
+  Table endpoints work fine. Not a key problem — verify with `--probe`,
+  which mints `public._startup_probe`, tests the anon key against it, and
+  drops it again.
+- Sentry auth tokens **must have scopes ticked** at creation. A token with an
+  empty scope set returns 403 on every endpoint (including `/users/me/`);
+  `node scripts/verify-staging.mjs` decodes the embedded payload and tells
+  you when this happens. Required scopes: `org:read`, `project:read`,
+  `project:releases`, `event:write`.
+
+The staging project is linked for migrations (`supabase link --project-ref`),
+so T02's `supabase db push` targets it directly.
