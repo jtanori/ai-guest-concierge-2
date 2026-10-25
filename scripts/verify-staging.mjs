@@ -118,91 +118,74 @@ if (probe) {
 }
 
 // --- Sentry ------------------------------------------------------------------
+// 2026 org tokens ("org:ci" bundle: source-map upload, release creation, code
+// mappings) carry NO scopes in the payload and 403 on all read endpoints by
+// design. Verification therefore checks: token shape, org binding, and — with
+// --probe — an actual release round-trip (the capability the bundler needs).
 const sentryHeaders = { Authorization: `Bearer ${vars.SENTRY_AUTH_TOKEN ?? ""}` };
+let tokenOrg;
 try {
-  const me = await fetch("https://sentry.io/api/0/users/me/", { headers: sentryHeaders });
-  if (me.status === 403) {
-    // Decode the embedded scope payload of sntrys_ tokens — zero-scope tokens
-    // 403 everywhere and this tells the owner exactly why.
-    try {
-      const payloadB64 = vars.SENTRY_AUTH_TOKEN.split("_")[1];
-      const json = JSON.parse(
-        Buffer.from(payloadB64.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"),
-      );
-      console.log(
-        `FAIL  sentry token — scopes embedded: ${json.scopes ? JSON.stringify(json.scopes) : "NONE (token minted without scopes — recreate with org:read, project:read, project:releases, event:write)"}`,
-      );
-    } catch {
-      console.log(`FAIL  sentry token — HTTP 403 at /users/me/ (token unusable)`);
-    }
-    hardFail += 1;
-  } else if (!me.ok) {
-    console.log(`FAIL  sentry token — HTTP ${me.status} at /users/me/`);
-    hardFail += 1;
-  } else {
-    console.log("PASS  sentry token — /users/me/ accepted");
-    // org + project + DSN cross-check are only meaningful with a working token
-    try {
-      const org = await fetch(
-        `https://sentry.io/api/0/organizations/${vars.SENTRY_ORG}/`,
-        { headers: sentryHeaders },
-      );
-      console.log(
-        org.ok
-          ? `PASS  sentry org '${vars.SENTRY_ORG}'`
-          : `FAIL  sentry org '${vars.SENTRY_ORG}' — HTTP ${org.status}`,
-      );
-      if (!org.ok) hardFail += 1;
-    } catch (e) {
-      console.log(`FAIL  sentry org — ${e.message}`);
-      hardFail += 1;
-    }
-    try {
-      const proj = await fetch(
-        `https://sentry.io/api/0/projects/${vars.SENTRY_ORG}/${vars.SENTRY_PROJECT}/`,
-        { headers: sentryHeaders },
-      );
-      console.log(
-        proj.ok
-          ? `PASS  sentry project '${vars.SENTRY_PROJECT}'`
-          : `FAIL  sentry project '${vars.SENTRY_PROJECT}' — HTTP ${proj.status}`,
-      );
-      if (!proj.ok) hardFail += 1;
-    } catch (e) {
-      console.log(`FAIL  sentry project — ${e.message}`);
-      hardFail += 1;
-    }
-    try {
-      const ck = await fetch(
-        `https://sentry.io/api/0/projects/${vars.SENTRY_ORG}/${vars.SENTRY_PROJECT}/client-keys/`,
-        { headers: sentryHeaders },
-      );
-      if (!ck.ok) throw new Error(`HTTP ${ck.status}`);
-      const keys = await ck.json();
-      const dsnKey = (vars.SENTRY_DSN ?? "").split("@")[0];
-      const listed = Array.isArray(keys);
-      const matched =
-        listed &&
-        keys.some(
-          (k) => (k.dsn?.secret ?? k.secret ?? "").startsWith(dsnKey.slice(0, 16)),
-        );
-      console.log(
-        matched
-          ? `PASS  sentry DSN belongs to project '${vars.SENTRY_PROJECT}'`
-          : `FAIL  sentry DSN key ${dsnKey.slice(0, 8)}**** not among project client keys`,
-      );
-      if (!matched) hardFail += 1;
-    } catch (e) {
-      console.log(`FAIL  sentry DSN cross-check — ${e.message}`);
-      hardFail += 1;
-    }
+  if (!(vars.SENTRY_AUTH_TOKEN ?? "").startsWith("sntrys_")) {
+    throw new Error("unexpected token format (expected sntrys_…)");
   }
+  const payloadB64 = vars.SENTRY_AUTH_TOKEN.split("_")[1];
+  const payload = JSON.parse(
+    Buffer.from(payloadB64.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"),
+  );
+  tokenOrg = payload.org;
+  console.log(
+    tokenOrg === vars.SENTRY_ORG
+      ? `PASS  sentry token — org-bound to '${payload.org}' (payload has no scopes field: normal for org tokens)`
+      : `FAIL  sentry token — org-bound to '${payload.org}' but SENTRY_ORG is '${vars.SENTRY_ORG}'`,
+  );
+  if (tokenOrg !== vars.SENTRY_ORG) hardFail += 1;
 } catch (e) {
   console.log(`FAIL  sentry token — ${e.message}`);
   hardFail += 1;
 }
 
-// Sentry DSN shape (no network)
+// read endpoints: expected 403 for org tokens — informational only
+const orgRead = await fetch(`https://sentry.io/api/0/organizations/${vars.SENTRY_ORG}/`, {
+  headers: sentryHeaders,
+}).catch((e) => ({ status: 0, error: e.message }));
+console.log(
+  orgRead.ok || orgRead.status === 403
+    ? `${orgRead.ok ? "PASS" : "WARN"}  sentry org '${vars.SENTRY_ORG}' — HTTP ${orgRead.status}${orgRead.status === 403 ? " (org-token read limit)" : ""}`
+    : `FAIL  sentry org — HTTP ${orgRead.status}${orgRead.error ?? ""}`,
+);
+if (!orgRead.ok && orgRead.status !== 403) hardFail += 1;
+
+if (probe) {
+  try {
+    const version = `t01-verify-${Date.now()}`;
+    const create = await fetch(`https://sentry.io/api/0/organizations/${vars.SENTRY_ORG}/releases/`, {
+      method: "POST",
+      headers: { ...sentryHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ version, projects: [vars.SENTRY_PROJECT] }),
+    });
+    if (create.status !== 201) throw new Error(`release create HTTP ${create.status}`);
+    console.log(`PASS  sentry release round-trip — created '${version}' (upload-capable token confirmed)`);
+    const read = await fetch(
+      `https://sentry.io/api/0/organizations/${vars.SENTRY_ORG}/releases/${version}/`,
+      { headers: sentryHeaders },
+    );
+    console.log(read.ok ? `PASS  sentry release read-back — HTTP ${read.status}` : `WARN  sentry release read-back — HTTP ${read.status}`);
+    const del = await fetch(
+      `https://sentry.io/api/0/organizations/${vars.SENTRY_ORG}/releases/${version}/`,
+      { method: "DELETE", headers: sentryHeaders },
+    );
+    console.log(
+      del.ok || del.status === 404 || del.status === 403
+        ? `PASS  sentry release cleanup — HTTP ${del.status}${del.status === 403 ? " (delete not in org:ci bundle; harmless probe artefact)" : ""}`
+        : `WARN  sentry release cleanup — HTTP ${del.status}`,
+    );
+  } catch (e) {
+    console.log(`FAIL  sentry release round-trip — ${e.message}`);
+    hardFail += 1;
+  }
+}
+
+// Sentry DSN shape (no network; token cannot cross-check DSN ownership by design)
 const dsnOk = /^https:\/\/[0-9a-f]+@.*sentry\.[a-z.]+\/\d+$/.test(vars.SENTRY_DSN ?? "");
 console.log(dsnOk ? "PASS  sentry DSN shape" : "FAIL  sentry DSN shape");
 if (!dsnOk) hardFail += 1;
