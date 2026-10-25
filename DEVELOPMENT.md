@@ -80,11 +80,12 @@ Platform gotchas learned the hard way (2026 platform behaviour):
   Table endpoints work fine. Not a key problem — verify with `--probe`,
   which mints `public._startup_probe`, tests the anon key against it, and
   drops it again.
-- Sentry auth tokens **must have scopes ticked** at creation. A token with an
-  empty scope set returns 403 on every endpoint (including `/users/me/`);
-  `node scripts/verify-staging.mjs` decodes the embedded payload and tells
-  you when this happens. Required scopes: `org:read`, `project:read`,
-  `project:releases`, `event:write`.
+- Sentry **organization tokens** (the 2026 UI) are upload-capable but
+  read-limited: their payload carries no `scopes` field and read endpoints
+  (`/users/me/`, org info) 403 by design — with the `org:ci` bundle they
+  create releases and upload source maps, which is all the build plugin
+  needs. `node scripts/verify-staging.mjs --probe` proves it with a real
+  release round-trip (read-back 200; release *delete* is outside the bundle).
 
 The staging project is linked for migrations (`supabase link --project-ref`),
 so T02's `supabase db push` targets it directly.
