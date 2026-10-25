@@ -62,3 +62,17 @@ committed (`.env.example` placeholders enforced by test + security gates), provi
 owner-secret env vars with hard caps, server-only service-role key enforced by CI grep with a
 negative-control job. No business-sensitive data lives in this repo (docs describe products, not
 partners; eval fixtures use fictional demo hotels).
+
+## ADR-0005 — Staging region us-east-1 accepted; production must be eu-central-1
+
+**Date:** 22 Oct 2026 (founder decision during T01 staging verification)
+**Decision:** The existing staging Supabase project (`concierge`, us-east-1) is kept as-is instead
+of being recreated in **eu-central-1** (where the staging project was originally specified:
+"region EU (eu-central-1)" in PHASE-0-DECISIONS.md). **Production must run in eu-central-1** —
+that part of the original decision is unchanged.
+**Why:** Founder's call. GDPR-first launch markets (MX data residency is not in play yet; ES hotels
+start first in later phases if any EU property signs) — none of the staging traffic is EU-guest
+data; staging carries synthetic seeds only.
+**Cost:** Region drift is now tracked: any service touching staging data that claims EU residency
+must re-check this ADR. Prod = eu-central-1 is enforced at the prod project creation step, which
+is a founder-owned task later in Phase 2+.
